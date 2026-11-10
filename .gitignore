@@ -1,0 +1,31 @@
+
+# Dataset
+*.csv
+
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Hadoop
+hadoop/logs/
+hadoop/tmp/
+mapreduce/output/
+
+# Llaves SSH
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.pub
+
+# Archivos temporales y sistema operativo
+.DS_Store
+Thumbs.db
+*.log
