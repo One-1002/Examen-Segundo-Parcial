@@ -179,3 +179,96 @@ Después del reinicio, los 240 registros continuaron disponibles.
 La implementación utiliza Hadoop Streaming en modo local dentro de un contenedor. Aunque se utiliza el motor MapReduce de Hadoop, no se implementó un clúster multinodo con HDFS distribuido.
 
 La solución demuestra el procesamiento MapReduce, la integración con PostgreSQL, la exposición de resultados mediante API REST y la persistencia de información.
+
+## 11. Respuestas
+Diferencia entre los modos standalone, pseudo-distribuido y totalmente distribuido de Hadoop. ¿En cuál se usa HDFS?
+ Standalone: Hadoop funciona en una sola máquina, utilizando el sistema de archivos local y sin ejecutar servicios HDFS.
+ Pseudo-distribuido: los servicios de Hadoop se ejecutan en una sola máquina como procesos independientes y se utiliza HDFS.
+ Totalmente distribuido: Hadoop trabaja en varias máquinas conectadas, distribuyendo el almacenamiento y procesamiento de datos.
+ HDFS se utiliza en los modos pseudo-distribuido y totalmente distribuido.
+
+¿Por qué el dataset se monta como volumen y no se copia dentro de la imagen con COPY?
+
+Montar el dataset como volumen permite separar los datos de la imagen del contenedor, evitando reconstruirla cada vez que cambia el archivo. Además, facilita trabajar con archivos grandes sin aumentar innecesariamente el tamaño de la imagen. También permite compartir los datos con el contenedor y establecer permisos de solo lectura para proteger el archivo original.
+
+
+ ¿Qué ocurre con los datos de la base de datos al ejecutar docker compose down? ¿Y con docker compose down -v?
+
+Al ejecutar docker compose down, los contenedores y la red se eliminan, pero los volúmenes nombrados permanecen, por lo que los datos de PostgreSQL se conservan. En cambio, al ejecutar docker compose down -v, también se eliminan los volúmenes asociados al proyecto, provocando la pérdida de los datos persistidos en PostgreSQL y de los demás volúmenes nombrados.
+
+
+¿Por qué MapReduce no siempre es más rápido que un script secuencial con un archivo de 400 MB? ¿A partir de qué condiciones conviene?
+
+MapReduce introduce sobrecarga por la inicialización de procesos, distribución de tareas, transferencia de datos y combinación de resultados. Para archivos relativamente pequeños, un script secuencial puede ser más rápido porque evita esos costos. MapReduce conviene cuando se procesan grandes volúmenes de datos, existen varios nodos disponibles y el trabajo puede dividirse en tareas paralelas que aprovechen los recursos distribuidos.
+
+Diferencia entre CMD y ENTRYPOINT, y entre COPY y ADD.
+CMD: establece el comando o los argumentos predeterminados que ejecutará el contenedor; puede reemplazarse al iniciar el contenedor.
+ ENTRYPOINT: define el ejecutable principal del contenedor y normalmente se mantiene incluso cuando se proporcionan argumentos adicionales.
+COPY: copia archivos o directorios desde el contexto de construcción hacia la imagen.
+ADD: realiza funciones similares a COPY, pero también permite descargar recursos desde URL y extraer automáticamente archivos comprimidos locales compatibles.
+
+## Reproducción del proyecto desde cero
+
+### Requisitos
+- Docker Desktop con WSL2.
+- Python 3 instalado.
+- Git.
+
+### Instalación y ejecución
+
+1. Clonar el repositorio.
+2. Crear el archivo de configuración:
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+3. Editar `.env` y establecer una contraseña propia para PostgreSQL.
+4. Generar el dataset:
+   ```powershell
+   python generar_dataset.py 125052348
+   ```
+5. Construir e iniciar los servicios:
+   ```powershell
+   docker compose up --build -d
+   ```
+
+El generador crea cinco millones de registros y utiliza la matrícula como semilla para obtener datos reproducibles. El archivo CSV y las credenciales no se incluyen en GitHub.
+
+### Respuestas teóricas
+
+**1. ¿Cuáles son los modos de ejecución de Hadoop?**
+
+- Standalone: ejecuta Hadoop en una sola máquina y utiliza el sistema de archivos local. No requiere HDFS.
+- Pseudo-distribuido: ejecuta los servicios de Hadoop como procesos independientes en una misma máquina y utiliza HDFS.
+- Totalmente distribuido: utiliza varias máquinas para distribuir almacenamiento y procesamiento mediante HDFS y YARN.
+
+Este proyecto utiliza el modo Standalone para ejecutar Hadoop Streaming dentro de un contenedor.
+
+**2. ¿Cuál es la diferencia entre utilizar un volumen y COPY en Docker?**
+
+COPY incorpora archivos dentro de la imagen durante su construcción. Un volumen permite almacenar y compartir datos fuera del ciclo de vida de los contenedores, conservando la información aunque estos se eliminen. Para este proyecto se utilizan volúmenes para persistir PostgreSQL y los resultados, mientras que el CSV se monta en modo de solo lectura.
+
+**3. ¿Qué sucede al ejecutar docker compose down y docker compose down -v?**
+
+`docker compose down` elimina los contenedores y la red, pero conserva los volúmenes nombrados. `docker compose down -v` también elimina los volúmenes, por lo que se pierde la información persistida en PostgreSQL.
+
+**4. ¿Por qué MapReduce no siempre es más rápido que el procesamiento secuencial?**
+
+MapReduce incorpora costos de inicialización, distribución de tareas, ordenamiento, transferencia de datos y reducción. En conjuntos pequeños o entornos de una sola máquina, estos costos pueden superar los beneficios del procesamiento paralelo. Su ventaja se observa principalmente con grandes volúmenes de información y múltiples nodos.
+
+**5. ¿Cuál es la diferencia entre CMD y ENTRYPOINT, y entre COPY y ADD?**
+
+- CMD define el comando o los argumentos predeterminados de un contenedor y puede ser reemplazado al ejecutarlo.
+- ENTRYPOINT define el ejecutable principal del contenedor.
+- COPY copia archivos y directorios locales hacia la imagen.
+- ADD también permite funcionalidades adicionales, como extraer archivos comprimidos locales y utilizar ciertas fuentes remotas. Se recomienda COPY cuando solamente se necesita copiar archivos.
+
+### Resultados de ejecución
+
+- Registros procesados: 5,000,000.
+- Grupos generados: 240.
+- Registros inválidos: 0.
+- Tiempo secuencial: 42.99 segundos.
+- Tiempo MapReduce: 49.12 segundos.
+- Coincidencia entre resultados: 100%.
+
+Ambos métodos generaron exactamente los mismos 240 grupos y los mismos ingresos totales.
